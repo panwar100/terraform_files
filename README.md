@@ -1,129 +1,113 @@
-# 🚀 Terraform AWS Infrastructure Modules
+## 🌍 Terraform Overview
 
-This repository contains modular and reusable Terraform configurations to provision AWS infrastructure resources such as **EC2 instances** and **S3 buckets**, along with variable modules for flexibility.
-
----
-
-## 📁 Repository Structure
-
-| Module Path                 | Description                              | Last Commit             |
-|-----------------------------|------------------------------------------|--------------------------|
-| `ec2/ec2_with_key/`         | Launch EC2 instance using existing SSH key | Create ec2_with_key      |
-| `ec2/ec2_without_key/`      | Auto-generate key pair and launch EC2     | Create ec2_without_key   |
-| `s3/s3_public/`             | Create a **public** S3 bucket              | Create s3_public         |
-| `s3/s3_private/`            | Create a **private** S3 bucket             | Create s3_private        |
-| `variables/ec2/`           | Variable definitions for EC2 modules      | Add files via upload     |
-| `variables/s3/`            | Variable definitions for S3 modules       | Add files via upload     |
+Terraform by HashiCorp is an Infrastructure as Code (IaC) tool that enables you to provision, manage, and version cloud infrastructure using a declarative language (HCL – HashiCorp Configuration Language).
 
 ---
 
-## 🧰 Prerequisites
+## 🧱 Core Terraform Components Explained
 
-- AWS CLI configured with IAM credentials  
-- [Terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli) installed  
-- SSH key for `ec2_with_key` module (or let `ec2_without_key` generate one)
+### 1️⃣ `variable` – Input Configuration
 
----
+Variables are used to **pass dynamic values** into your configuration. This makes your code reusable and configurable for different environments (dev, test, prod, etc.).
 
-## ⚙️ Terraform Commands (All Modules)
-
-| Command             | Description                                      |
-|---------------------|--------------------------------------------------|
-| `terraform init`    | Initialize Terraform and download providers      |
-| `terraform plan`    | Preview changes before applying                  |
-| `terraform apply`   | Provision AWS infrastructure                     |
-| `terraform destroy` | Tear down resources created by Terraform         |
-| `terraform output`  | Show output values defined in the configuration  |
-
----
-
-## 📦 EC2 Modules
-
-### 🔐 `ec2/ec2_with_key/`
-
-- Uses your **existing public key** file.
-- Creates an EC2 instance with key association.
-
-```bash
-cd ec2/ec2_with_key
-terraform init
-terraform plan
-terraform apply
-```
-✅ Ensure the public key file path in aws_key_pair is correctly set.
-
-### 🔐` ec2/ec2_without_key/`
-- Automatically generates a 4096-bit RSA key pair
-
-- Saves private key locally (`my-key.pem`)
-
-- Registers public key with AWS and launches EC2
-
-```bash
-cd ec2/ec2_without_key
-terraform init
-terraform plan
-terraform apply
-```
-📝 Outputs:
-
-- Public IP of EC2
-
-- Path to downloaded private key
-
-## 🪣 S3 Modules
-
-🌐` s3/s3_public/`
-- Creates a publicly accessible S3 bucket
-
-- Useful for hosting static content or public assets
-
-```bash
-cd s3/s3_public
-terraform init
-terraform plan
-terraform apply
-```
-⚠️ Review bucket policy to avoid accidental data exposure.
-
-### 🔐 `s3/s3_private/`
-- Creates a private S3 bucket
-
-- Ideal for internal logs, backups, or secure assets
-
-```bash
-cd s3/s3_private
-terraform init
-terraform plan
-terraform apply
-```
-## 📂 Variable Modules
-Reusable variable definitions to keep your Terraform DRY and modular.
-
-📌 `variables/ec2/`
-Stores input variables for EC2 modules
-
-Rename `varaibles.tf `to `variables.tf`for clarity
-
-```bash
-module "ec2_vars" {
-  source = "../variables/ec2"
+```hcl
+variable "region" {
+  description = "The AWS region to deploy resources in"
+  type        = string
+  default     = "us-east-1"
 }
 ```
-📌 `variables/s3/`
-Input variables for both public and private S3 modules
-
-```bash
-module "s3_vars" {
-  source = "../variables/s3"
+You access it using:
+```hcl
+provider "aws" {
+  region = var.region
 }
 ```
-## 🧼 Recommended .gitignore 
-```bash
-# Terraform-related
-*.tfstate
-*.tfstate.*
-.terraform/
-*.tfvars
-*.pem
+---
+
+### 2️⃣ `sets` – Unique Unordered List
+A set is a collection of unique values with no particular order. It prevents duplication and is useful when order doesn't matter (like availability zones).
+
+```hcl
+variable "azs" {
+  type = set(string)
+  default = ["us-east-1a", "us-east-1b"]
+}
 ```
+Terraform ensures values are unique.
+
+---
+
+### 3️⃣ `map` – Key-Value Pairs
+A map allows you to define dynamic lookups using keys. It's useful for selecting values based on a condition like a region or environment.
+
+```hcl
+variable "instance_amis" {
+  type = map(string)
+  default = {
+    us-east-1 = "ami-0c55b159cbfafe1f0"
+    us-west-2 = "ami-0a91cd140a1fc148a"
+  }
+}
+```
+Usage:
+
+```hcl
+ami = var.instance_amis[var.region]
+```
+
+---
+
+### 4️⃣ `object` – Structured Complex Data
+An object is used to group multiple named attributes together into a single variable. It’s ideal for configs like database settings or tagging conventions.
+
+```hcl
+variable "db_config" {
+  type = object({
+    engine         = string
+    engine_version = string
+    instance_class = string
+  })
+
+  default = {
+    engine         = "mysql"
+    engine_version = "8.0"
+    instance_class = "db.t3.micro"
+  }
+}
+```
+Usage:
+
+```hcl
+resource "aws_db_instance" "example" {
+  engine         = var.db_config.engine
+  engine_version = var.db_config.engine_version
+  instance_class = var.db_config.instance_class
+}
+```
+---
+
+### 5️⃣ `module` – Reusable Terraform Code
+Modules are containers for reusable Terraform configurations. They let you organize code logically (e.g., separate modules for VPC, EC2, RDS).
+
+```hcl
+module "vpc" {
+  source = "./modules/vpc"
+  cidr_block = "10.0.0.0/16"
+  azs        = var.azs
+}
+```
+You can create a module once and call it with different inputs as needed.
+
+--- 
+
+### 🚀 Why Use These Components?
+variable: Makes code dynamic and flexible.
+
+set: Ensures uniqueness in lists (e.g., AZs, ports).
+
+map: Easily manage environment- or region-specific values.
+
+object: Organize related settings into structured data.
+
+module: Encapsulate logic, reduce repetition, and improve code reusability.
